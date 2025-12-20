@@ -1,0 +1,910 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"name":"csharp"},{"name":"fsharp","languageName":"F#","aliases":["f#","fs"]},{"name":"html","languageName":"HTML"},{"name":"http","languageName":"HTTP"},{"name":"javascript","languageName":"JavaScript","aliases":["js"]},{"name":"mermaid","languageName":"Mermaid"},{"name":"pwsh","languageName":"PowerShell","aliases":["powershell"]},{"name":"sql-SqlServer","languageName":"T-SQL"},{"name":"value"}]}}
+
+#!markdown
+
+# Invulsjabloon project: deel SQL
+
+#!sql-SqlServer
+
+// Deze code laad de Polygot plugin die nodig is om te communiceren met SQL Server.
+// Voer deze code uit voordat je SQL Server gerelateerde cellen uitvoert.
+#r "nuget:Microsoft.DotNet.Interactive.SqlServer, *-*"
+
+#!sql-SqlServer
+
+// Je mag deze code niet aanpassen en moet deze NIET begrijpen.
+// Voer deze code uit voordat je SQL Server gerelateerde cellen uitvoert.
+
+using Microsoft.DotNet.Interactive;
+using Microsoft.DotNet.Interactive.Commands;
+
+var shortName = "SqlServer";             
+var fullName  = $"sql-{shortName}";
+
+var kernels = Kernel.Root.FindKernels(k => k.Name == fullName);
+
+if (!kernels.Any())
+{
+    await Kernel.Root.SendAsync(new SubmitCode(
+        @"#!connect mssql --kernel-name SqlServer --connection-string ""Server=localhost,1433;Database=Databases;User Id=sa;Password=Pass.Word;TrustServerCertificate=True;"""
+    ));
+}
+
+#!markdown
+
+## Reset script
+
+#!sql-SqlServer
+
+-- -- In juiste volgorde droppen
+DROP TABLE IF EXISTS Petanque.Match;
+DROP TABLE IF EXISTS Petanque.Eindronde;
+DROP TABLE IF EXISTS Petanque.CompetitieDeelname;
+DROP TABLE IF EXISTS Petanque.TeamSpeler;
+DROP TABLE IF EXISTS Petanque.ClubTeam;
+DROP TABLE IF EXISTS Petanque.Speler;
+DROP TABLE IF EXISTS Petanque.Terrein;
+DROP TABLE IF EXISTS Petanque.Club;
+DROP TABLE IF EXISTS Petanque.Competitie;
+DROP TABLE IF EXISTS Petanque.Afdeling;
+DROP TABLE IF EXISTS Petanque.ReeksNiveau;
+DROP TABLE IF EXISTS Petanque.Provincie;
+DROP TABLE IF EXISTS Petanque.NiveauType;
+
+-- Schema verwijderen
+DROP SCHEMA IF EXISTS Petanque;
+GO
+
+#!markdown
+
+## Create tables
+
+#!sql-SqlServer
+
+-- 
+CREATE SCHEMA Petanque;
+GO
+--Enumeratie‑tabellen
+CREATE TABLE Petanque.NiveauType
+(
+    Id   int IDENTITY(1,1),
+    naam varchar(50) NOT NULL,
+    CONSTRAINT PK_NiveauType PRIMARY KEY (Id)
+);
+
+CREATE TABLE Petanque.ReeksNiveau
+(
+    Id   int IDENTITY(1,1),
+    naam varchar(50) NOT NULL,
+    CONSTRAINT PK_ReeksNiveau PRIMARY KEY (Id)
+);
+
+CREATE TABLE Petanque.Provincie
+(
+    Id   int IDENTITY(1,1),
+    naam varchar(50) NOT NULL,
+    CONSTRAINT PK_Provincie PRIMARY KEY (Id)
+);
+
+-- Afdeling
+CREATE TABLE Petanque.Afdeling
+(
+    Id            int IDENTITY(1,1),
+    ReeksNiveauId int NOT NULL,
+    ProvincieId   int NOT NULL,
+    NiveauTypeId  int NOT NULL,
+    CONSTRAINT PK_Afdeling PRIMARY KEY (Id),
+    CONSTRAINT FK_Afdeling_ReeksNiveau
+        FOREIGN KEY (ReeksNiveauId) REFERENCES Petanque.ReeksNiveau(Id),
+    CONSTRAINT FK_Afdeling_Provincie
+        FOREIGN KEY (ProvincieId)   REFERENCES Petanque.Provincie(Id),
+    CONSTRAINT FK_Afdeling_NiveauType
+        FOREIGN KEY (NiveauTypeId)  REFERENCES Petanque.NiveauType(Id)
+);
+
+
+--Club
+CREATE TABLE Petanque.Club
+(
+    Id               int IDENTITY(1,1),
+    ProvincieId      int          NOT NULL,
+    naam             varchar(100) NOT NULL,
+    adres            varchar(200) NOT NULL,
+    aantalTerreinen  int          NOT NULL
+        CHECK (aantalTerreinen IN (3,6,9,12)),
+    gebouwGoedgekeurd bit         NOT NULL,
+    tshirtVerplicht  bit          NOT NULL DEFAULT 0,
+    licentieNummer   varchar(50)  NOT NULL,
+    oprichtingsDatum date         NOT NULL,
+    CONSTRAINT PK_Club PRIMARY KEY (Id),
+    CONSTRAINT AK_Club_licentie UNIQUE (licentieNummer),
+    CONSTRAINT FK_Club_Provincie
+        FOREIGN KEY (ProvincieId) REFERENCES Petanque.Provincie(Id)
+);
+
+
+--Terrein
+CREATE TABLE Petanque.Terrein
+(
+    Id         int IDENTITY(1,1),
+    ClubId     int          NOT NULL,
+    nummer     int          NOT NULL,
+    lengte_m   decimal(5,2) NOT NULL CHECK (lengte_m  > 10),
+    breedte_m  decimal(5,2) NOT NULL CHECK (breedte_m > 2),
+    CONSTRAINT PK_Terrein PRIMARY KEY (Id),
+    CONSTRAINT FK_Terrein_Club
+        FOREIGN KEY (ClubId) REFERENCES Petanque.Club (Id)
+            ON DELETE CASCADE
+);
+
+
+--Speler
+CREATE TABLE Petanque.Speler
+(
+    Id             int IDENTITY(1,1),
+    ClubId         int           NOT NULL,
+    naam           varchar(100)  NOT NULL,
+    geboortedatum  date          NOT NULL,
+    licentieNummer varchar(50)   NOT NULL,
+    CONSTRAINT PK_Speler PRIMARY KEY (Id),
+    CONSTRAINT FK_Speler_Club
+        FOREIGN KEY (ClubId) REFERENCES Petanque.Club (Id),
+    CONSTRAINT UK_Speler_licentie UNIQUE (licentieNummer)
+);
+
+--ClubTeam
+CREATE TABLE Petanque.ClubTeam
+(
+    ploegId     int IDENTITY(1,1),
+    ClubId      int          NOT NULL,
+    naam        varchar(50)  NOT NULL,
+    maxSpelers  int          NOT NULL DEFAULT 12,
+    minSpelers  int          NOT NULL DEFAULT 9,
+    actief      bit          NOT NULL,
+    CONSTRAINT PK_ClubTeam PRIMARY KEY (ploegId),
+    CONSTRAINT FK_ClubTeam_Club
+        FOREIGN KEY (ClubId) REFERENCES Petanque.Club (Id)
+);
+
+--TeamSpeler
+CREATE TABLE Petanque.TeamSpeler
+(
+    Id         int IDENTITY(1,1),
+    ploegId    int  NOT NULL,
+    SpelerId   int  NOT NULL,
+    vanafDatum date NOT NULL,
+    totDatum   date NULL,
+    CONSTRAINT PK_TeamSpeler PRIMARY KEY (Id),
+    CONSTRAINT FK_TeamSpeler_ClubTeam
+        FOREIGN KEY (ploegId)  REFERENCES Petanque.ClubTeam (ploegId)
+            ON DELETE CASCADE,
+    CONSTRAINT FK_TeamSpeler_Speler
+        FOREIGN KEY (SpelerId) REFERENCES Petanque.Speler (Id)
+            ON DELETE CASCADE
+);
+
+--Competitie
+CREATE TABLE Petanque.Competitie
+(
+    Id              int IDENTITY(1,1),
+    AfdelingId      int         NOT NULL,
+    ReeksNiveauId   int         NOT NULL,          -- enum als FK
+    Seizoen         varchar(9)  NOT NULL,
+    startUur        time        NOT NULL DEFAULT('14:00'),
+    aantalSpeeldagen int        NOT NULL,
+    CONSTRAINT PK_Competitie PRIMARY KEY (Id),
+    CONSTRAINT FK_Competitie_Afdeling
+        FOREIGN KEY (AfdelingId)    REFERENCES Petanque.Afdeling (Id),
+    CONSTRAINT FK_Competitie_ReeksNiveau
+        FOREIGN KEY (ReeksNiveauId) REFERENCES Petanque.ReeksNiveau (Id)
+);
+
+
+--CompetitieDeelname
+CREATE TABLE Petanque.CompetitieDeelname
+(
+    Id           int IDENTITY(1,1),
+    CompetitieId int NOT NULL,
+    ClubId       int NOT NULL,
+    ploegId      int NOT NULL,
+    punten       int NOT NULL DEFAULT 0,
+    positie      int NOT NULL DEFAULT 0,
+    isKampioen   bit NULL,
+    isDegradant  bit NULL,
+    CONSTRAINT PK_CompetitieDeelname PRIMARY KEY (Id),
+    CONSTRAINT FK_CD_Competitie
+        FOREIGN KEY (CompetitieId) REFERENCES Petanque.Competitie (Id)
+            ON DELETE CASCADE,
+    CONSTRAINT FK_CD_Club
+        FOREIGN KEY (ClubId)       REFERENCES Petanque.Club (Id),
+    CONSTRAINT FK_CD_ClubTeam
+        FOREIGN KEY (ploegId)      REFERENCES Petanque.ClubTeam (ploegId),
+    CONSTRAINT UK_CD_CompetitiePloeg UNIQUE (CompetitieId, ploegId)
+);
+
+
+--Match
+CREATE TABLE Petanque.Match
+(
+    Id           int IDENTITY(1,1),
+    CompetitieId int     NOT NULL,
+    thuisPloegId int     NOT NULL,
+    uitPloegId   int     NOT NULL,
+    speeldag     int     NOT NULL,
+    datum        date    NULL,
+    startUur     time    NOT NULL DEFAULT('14:00'),
+    puntenThuis  int     NULL,
+    puntenUit    int     NULL,
+    CONSTRAINT PK_Match PRIMARY KEY (Id),
+    CONSTRAINT FK_Match_Competitie
+        FOREIGN KEY (CompetitieId) REFERENCES Petanque.Competitie (Id)
+            ON DELETE CASCADE,
+    CONSTRAINT FK_Match_Thuis
+        FOREIGN KEY (thuisPloegId) REFERENCES Petanque.ClubTeam (ploegId),
+    CONSTRAINT FK_Match_Uit
+        FOREIGN KEY (uitPloegId)   REFERENCES Petanque.ClubTeam (ploegId),
+    CONSTRAINT CK_Match_ThuisUit CHECK (thuisPloegId <> uitPloegId)
+);
+
+
+--Eindronde
+CREATE TABLE Petanque.Eindronde
+(
+    Id             int IDENTITY(1,1),
+    ReeksNiveauId  int         NOT NULL,
+    winnaarPloegId int         NOT NULL,
+    seizoen        varchar(9)  NOT NULL,
+    CONSTRAINT PK_Eindronde PRIMARY KEY (Id),
+    CONSTRAINT FK_Eindronde_ReeksNiveau
+        FOREIGN KEY (ReeksNiveauId)  REFERENCES Petanque.ReeksNiveau(Id),
+    CONSTRAINT FK_Eindronde_Winnaar
+        FOREIGN KEY (winnaarPloegId) REFERENCES Petanque.ClubTeam(ploegId)
+);
+
+#!markdown
+
+## Data
+
+Voorzie minstens 10 records met data per table.
+
+#!sql-SqlServer
+
+---Enumeraties
+---- Provincie
+INSERT INTO Petanque.Provincie (naam) VALUES
+('Vlaams-Brabant'),
+('Antwerpen'),
+('Oost-Vlaanderen'),
+('West-Vlaanderen'),
+('Limburg');
+
+-- ReeksNiveau
+INSERT INTO Petanque.ReeksNiveau (naam) VALUES
+('Nationaal 1'),
+('Nationaal 2'),
+('Federaal 1'),
+('Federaal 2'),
+('Ere'),
+('Provinciaal 1'),
+('Provinciaal 2'),
+('Provinciaal 3'),
+('Provinciaal 4');
+
+-- NiveauType
+INSERT INTO Petanque.NiveauType (naam) VALUES
+('Provinciaal'),
+('Federaal'),
+('Nationaal');
+
+--Afdeling
+INSERT INTO Petanque.Afdeling (ReeksNiveauId, ProvincieId, NiveauTypeId) VALUES
+(5, 1, 1), -- Ere Vlaams-Brabant
+(6, 1, 1),
+(7, 1, 1),
+(8, 1, 1),
+(9, 1, 1),
+(5, 2, 1),
+(6, 2, 1),
+(7, 2, 1),
+(8, 2, 1),
+(9, 2, 1),
+(5, 3, 1),
+(6, 3, 1),
+(5, 4, 1),
+(5, 5, 1),
+(4, 3, 2); -- Federaal 2 (niveauType Federaal, ReeksNiveauId 4)
+
+--Club
+
+INSERT INTO Petanque.Club
+(ProvincieId, naam, adres, aantalTerreinen, gebouwGoedgekeurd,
+ tshirtVerplicht, licentieNummer, oprichtingsDatum)
+VALUES
+(1,'BC Leuven','Bondgenotenlaan 10, 3000 Leuven',6,1,0,'CLB001','1990-05-01'),
+(1,'BC Tienen','Grote Markt 2, 3300 Tienen',3,1,0,'CLB002','1995-09-15'),
+(2,'BC Antwerpen','Meir 100, 2000 Antwerpen',9,1,1,'CLB003','1985-03-20'),
+(2,'BC Deurne','Turnhoutsebaan 200, 2100 Deurne',6,1,0,'CLB004','2000-04-10'),
+(3,'BC Gent','Korenmarkt 5, 9000 Gent',12,1,1,'CLB005','1978-11-30'),
+(3,'BC Sint-Niklaas','Stationsplein 1, 9100 Sint-Niklaas',6,0,0,'CLB006','2005-01-01'),
+(4,'BC Brugge','Markt 1, 8000 Brugge',9,1,1,'CLB007','1988-07-07'),
+(4,'BC Oostende','Zeedi k 50, 8400 Oostende',6,1,0,'CLB008','1992-06-12'),
+(5,'BC Hasselt','Groenplein 4, 3500 Hasselt',3,1,0,'CLB009','1999-09-09'),
+(5,'BC Genk','Centrumlaan 20, 3600 Genk',6,0,0,'CLB010','2010-10-10'),
+(1,'BC Aarschot','Demervallei 12, 3200 Aarschot',3,1,0,'CLB011','2003-03-03'),
+(2,'BC Lier','Zimmerplein 3, 2500 Lier',3,1,0,'CLB012','1997-08-18'),
+(3,'BC Aalst','Hopmarkt 8, 9300 Aalst',6,1,0,'CLB013','1982-02-02'),
+(4,'BC Roeselare','Stationsstraat 40, 8800 Roeselare',3,1,0,'CLB014','2015-05-05'),
+(5,'BC Tongeren','Pliniuspark 1, 3700 Tongeren',3,1,0,'CLB015','2008-12-12');
+
+--Terrein
+INSERT INTO Petanque.Terrein (ClubId, nummer, lengte_m, breedte_m) VALUES
+-- Club 1: 2 ploegen => minstens 6 terreinen
+(1,1,12.0,3.0),(1,2,12.0,3.0),(1,3,11.5,2.5),
+(1,4,11.5,2.5),(1,5,12.0,3.0),(1,6,12.0,3.0),
+
+-- Club 2: 2 ploegen => 6 terreinen
+(2,1,10.5,2.5),(2,2,11.0,2.8),(2,3,12.0,3.2),
+(2,4,11.5,2.6),(2,5,11.8,2.9),(2,6,12.2,3.1),
+
+-- Club 3: 2 ploegen => 6 terreinen
+(3,1,13.0,3.0),(3,2,13.0,3.0),(3,3,13.0,3.0),
+(3,4,12.5,3.0),(3,5,12.5,3.0),(3,6,12.5,3.0),
+
+-- Club 4: 1 ploeg => 3 terreinen
+(4,1,11.0,2.5),(4,2,11.0,2.5),(4,3,11.0,2.5),
+
+-- Club 5: 2 ploegen => 6 terreinen
+(5,1,12.5,3.0),(5,2,12.5,3.0),(5,3,12.5,3.0),
+(5,4,12.0,3.0),(5,5,12.0,3.0),(5,6,12.0,3.0),
+
+-- Club 6‑10: 1 ploeg => 3 terreinen per club
+(6,1,11.0,2.6),(6,2,11.0,2.6),(6,3,11.0,2.6),
+(7,1,12.0,3.0),(7,2,12.0,3.0),(7,3,12.0,3.0),
+(8,1,11.5,2.7),(8,2,11.5,2.7),(8,3,11.5,2.7),
+(9,1,10.8,2.5),(9,2,10.8,2.5),(9,3,10.8,2.5),
+(10,1,11.2,2.6),(10,2,11.2,2.6),(10,3,11.2,2.6),
+
+-- Club 11: 1 ploeg => 3 terreinen
+(11,1,11.5,2.8),(11,2,11.5,2.8),(11,3,11.5,2.8);
+
+
+--Speler
+INSERT INTO Petanque.Speler (ClubId, naam, geboortedatum, licentieNummer) VALUES
+-- Ploeg 1 (Club 1) – 12 spelers
+(1,'Jan Peeters','1985-01-15','SP001'),
+(1,'Kurt Janssens','1990-03-20','SP002'),
+(1,'Tom Willems','1992-07-05','SP003'),
+(1,'Peter Claes','1987-11-12','SP004'),
+(1,'Steven De Vos','1991-04-18','SP005'),
+(1,'Geert Verbeeck','1984-09-09','SP006'),
+(1,'Bert Meersman','1989-02-02','SP007'),
+(1,'Joachim Van den Broeck','1993-06-30','SP008'),
+(1,'Nico De Wilde','1986-08-08','SP009'),
+(1,'Rik Goossens','1982-03-03','SP010'),
+(1,'Koen Vermeiren','1994-12-21','SP011'),
+(1,'Filip Maes','1988-07-17','SP012'),
+
+-- Ploeg 2 (Club 1) – 10 spelers
+(1,'Stijn Hermans','1990-01-10','SP013'),
+(1,'Jeroen Briers','1991-05-05','SP014'),
+(1,'Jelle Mertens','1992-09-09','SP015'),
+(1,'Davy De Smet','1987-07-07','SP016'),
+(1,'Matthias Boons','1993-11-11','SP017'),
+(1,'Sander Peeters','1995-03-03','SP018'),
+(1,'Robin Janssen','1989-10-20','SP019'),
+(1,'Bram Luyten','1986-06-16','SP020'),
+(1,'Milan De Winter','1994-02-14','SP021'),
+(1,'Laurens Vangenechten','1996-04-04','SP022'),
+
+-- Ploeg 3 (Club 2) – 11 spelers
+(2,'Tim Ruyssen','1985-02-02','SP023'),
+(2,'Jonas Vandezande','1991-09-15','SP024'),
+(2,'Ruben', 'DHaese','1990-12-01','SP025'),
+(2,'Pieter-Jan Verelst','1988-08-18','SP026'),
+(2,'Arne Van Gorp','1993-03-30','SP027'),
+(2,'Kenny De Pooter','1994-01-25','SP028'),
+(2,'Wouter Van Aerschot','1987-07-22','SP029'),
+(2,'Jens Van Nuffel','1992-05-19','SP030'),
+(2,'Niels Van Hove','1995-10-10','SP031'),
+(2,'Robin De Keersmaeker','1989-04-04','SP032'),
+(2,'Tommy Verdonck','1984-06-06','SP033'),
+
+-- Ploeg 4 (Club 2) – 9 spelers
+(2,'Dries Coppens','1986-01-06','SP034'),
+(2,'Ewout Van Camp','1991-02-12','SP035'),
+(2,'Sigi De Ridder','1988-09-19','SP036'),
+(2,'Kevin Van Rooy','1990-11-23','SP037'),
+(2,'Glen De Backer','1993-07-27','SP038'),
+(2,'Dario Van Looy','1994-03-13','SP039'),
+(2,'Maarten Wyns','1985-05-25','SP040'),
+(2,'Stefaan Dierckx','1982-08-08','SP041'),
+(2,'Sam Pauwels','1996-10-30','SP042'),
+
+-- Ploeg 5 (Club 3) – 12 spelers
+(3,'Koenraad De Moor','1983-02-14','SP043'),
+(3,'Ward De Waele','1988-04-09','SP044'),
+(3,'Hans Verdonck','1986-12-12','SP045'),
+(3,'Tijs De Troyer','1991-01-21','SP046'),
+(3,'Gert-Jan De Wilde','1990-06-06','SP047'),
+(3,'Dirk Vandenberghe','1980-03-03','SP048'),
+(3,'Johan Van den Bossche','1979-09-09','SP049'),
+(3,'Patrick Hermans','1978-11-11','SP050'),
+(3,'Franky Bogaert','1977-07-07','SP051'),
+(3,'Nico Van Parys','1984-08-18','SP052'),
+(3,'Kris Van Overloop','1985-05-15','SP053'),
+(3,'Andy Van den Bergh','1987-10-01','SP054'),
+
+-- Ploeg 6 (Club 3) – 9 spelers
+(3,'Robby Jans','1992-02-02','SP055'),
+(3,'Nick Van Laere','1993-03-03','SP056'),
+(3,'Christophe Van Dyck','1994-04-04','SP057'),
+(3,'Alexander De Winter','1995-05-05','SP058'),
+(3,'Gill Van Wijk','1996-06-06','SP059'),
+(3,'Arno Van Damme','1990-07-07','SP060'),
+(3,'Marnik Peeters','1989-08-08','SP061'),
+(3,'Jordi Smet','1988-09-09','SP062'),
+(3,'Raf De Boeck','1987-10-10','SP063'),
+
+-- Ploeg 7 (Club 4) – 10 spelers
+(4,'Nico Van Loon','1984-01-14','SP064'),
+(4,'Tommy De Leeuw','1985-02-16','SP065'),
+(4,'Yannick Van Eyck','1986-03-18','SP066'),
+(4,'Gilles De Moor','1987-04-20','SP067'),
+(4,'Kevin Van Doninck','1988-05-22','SP068'),
+(4,'Karel De Groof','1989-06-24','SP069'),
+(4,'Manu Van Rompaey','1990-07-26','SP070'),
+(4,'Staf Goris','1979-08-28','SP071'),
+(4,'Jordi Van Avermaet','1992-09-30','SP072'),
+(4,'Lars De Wilde','1993-10-10','SP073'),
+
+-- Ploeg 8 (Club 5) – 11 spelers
+(5,'Pieter Goethals','1985-03-03','SP074'),
+(5,'Kris De Bruyne','1986-04-04','SP075'),
+(5,'Robbe Verstraete','1987-05-05','SP076'),
+(5,'Jasper Van Nieuwenhuysen','1988-06-06','SP077'),
+(5,'Brecht De Clercq','1989-07-07','SP078'),
+(5,'Robin De Baere','1990-08-08','SP079'),
+(5,'Cedric De Raes','1991-09-09','SP080'),
+(5,'Simon De Vuyst','1992-10-10','SP081'),
+(5,'Timon De Cock','1993-11-11','SP082'),
+(5,'Mauro Lammens','1994-12-12','SP083'),
+(5,'Kenneth Van Hecke','1995-01-13','SP084'),
+
+-- Ploeg 9 (Club 5) – 9 spelers
+(5,'Ruben Van Horebeek','1986-02-02','SP085'),
+(5,'Jelle De Swaef','1987-03-03','SP086'),
+(5,'Dries De Groote','1988-04-04','SP087'),
+(5,'Benny De Schrijver','1989-05-05','SP088'),
+(5,'Koenraad De Bondt','1990-06-06','SP089'),
+(5,'Christof Van Impe','1991-07-07','SP090'),
+(5,'Maik Van Den Bossche','1992-08-08','SP091'),
+(5,'Jonas Van Bellingen','1993-09-09','SP092'),
+(5,'Stijn De Bie','1994-10-10','SP093'),
+
+-- Ploeg 10 (Club 6) – 12 spelers
+(6,'Stef De Ryck','1984-01-01','SP094'),
+(6,'Tom De Wael','1985-02-02','SP095'),
+(6,'Jorn De Ridder','1986-03-03','SP096'),
+(6,'Kevin De Graef','1987-04-04','SP097'),
+(6,'Sven Van den Eede','1988-05-05','SP098'),
+(6,'Tommy De Houwer','1989-06-06','SP099'),
+(6,'Kevin Goovaerts','1990-07-07','SP100'),
+(6,'Tim De Pauw','1991-08-08','SP101'),
+(6,'Nico Van Riet','1992-09-09','SP102'),
+(6,'Bart Van den Bossche','1993-10-10','SP103'),
+(6,'Chris Van Hove','1994-11-11','SP104'),
+(6,'Kenny De Meyer','1995-12-12','SP105'),
+
+-- Ploeg 11 (Club 7) – 11 spelers
+(7,'Kurt Verbruggen','1983-01-05','SP106'),
+(7,'Gino De Coninck','1984-02-06','SP107'),
+(7,'Luc Van Severen','1985-03-07','SP108'),
+(7,'Marc Coene','1986-04-08','SP109'),
+(7,'Johan Van Goethem','1987-05-09','SP110'),
+(7,'Peter De Becker','1988-06-10','SP111'),
+(7,'Erik De Maeyer','1989-07-11','SP112'),
+(7,'Willy Van Damme','1978-08-12','SP113'),
+(7,'Patrick De Winne','1979-09-13','SP114'),
+(7,'Rudy De Cooman','1980-10-14','SP115'),
+(7,'Danny De Smet','1981-11-15','SP116');
+
+
+--TeamSpeler
+-- Ploeg 1: SP001–SP012
+INSERT INTO Petanque.TeamSpeler (ploegId, SpelerId, vanafDatum, totDatum) VALUES
+(1,1,'2024-09-01',NULL),
+(1,2,'2024-09-01',NULL),
+(1,3,'2024-09-01',NULL),
+(1,4,'2024-09-01',NULL),
+(1,5,'2024-09-01',NULL),
+(1,6,'2024-09-01',NULL),
+(1,7,'2024-09-01',NULL),
+(1,8,'2024-09-01',NULL),
+(1,9,'2024-09-01',NULL),
+(1,10,'2024-09-01',NULL),
+(1,11,'2024-09-01',NULL),
+(1,12,'2024-09-01',NULL),
+
+-- Ploeg 2: SP013–SP022
+(2,13,'2024-09-01',NULL),
+(2,14,'2024-09-01',NULL),
+(2,15,'2024-09-01',NULL),
+(2,16,'2024-09-01',NULL),
+(2,17,'2024-09-01',NULL),
+(2,18,'2024-09-01',NULL),
+(2,19,'2024-09-01',NULL),
+(2,20,'2024-09-01',NULL),
+(2,21,'2024-09-01',NULL),
+(2,22,'2024-09-01',NULL),
+
+-- Ploeg 3: SP023–SP033
+(3,23,'2024-09-01',NULL),
+(3,24,'2024-09-01',NULL),
+(3,25,'2024-09-01',NULL),
+(3,26,'2024-09-01',NULL),
+(3,27,'2024-09-01',NULL),
+(3,28,'2024-09-01',NULL),
+(3,29,'2024-09-01',NULL),
+(3,30,'2024-09-01',NULL),
+(3,31,'2024-09-01',NULL),
+(3,32,'2024-09-01',NULL),
+(3,33,'2024-09-01',NULL),
+
+-- Ploeg 4: SP034–SP042
+(4,34,'2024-09-01',NULL),
+(4,35,'2024-09-01',NULL),
+(4,36,'2024-09-01',NULL),
+(4,37,'2024-09-01',NULL),
+(4,38,'2024-09-01',NULL),
+(4,39,'2024-09-01',NULL),
+(4,40,'2024-09-01',NULL),
+(4,41,'2024-09-01',NULL),
+(4,42,'2024-09-01',NULL),
+
+-- Ploeg 5: SP043–SP054
+(5,43,'2024-09-01',NULL),
+(5,44,'2024-09-01',NULL),
+(5,45,'2024-09-01',NULL),
+(5,46,'2024-09-01',NULL),
+(5,47,'2024-09-01',NULL),
+(5,48,'2024-09-01',NULL),
+(5,49,'2024-09-01',NULL),
+(5,50,'2024-09-01',NULL),
+(5,51,'2024-09-01',NULL),
+(5,52,'2024-09-01',NULL),
+(5,53,'2024-09-01',NULL),
+(5,54,'2024-09-01',NULL),
+
+-- Ploeg 6: SP055–SP063
+(6,55,'2024-09-01',NULL),
+(6,56,'2024-09-01',NULL),
+(6,57,'2024-09-01',NULL),
+(6,58,'2024-09-01',NULL),
+(6,59,'2024-09-01',NULL),
+(6,60,'2024-09-01',NULL),
+(6,61,'2024-09-01',NULL),
+(6,62,'2024-09-01',NULL),
+(6,63,'2024-09-01',NULL),
+
+-- Ploeg 7: SP064–SP073
+(7,64,'2024-09-01',NULL),
+(7,65,'2024-09-01',NULL),
+(7,66,'2024-09-01',NULL),
+(7,67,'2024-09-01',NULL),
+(7,68,'2024-09-01',NULL),
+(7,69,'2024-09-01',NULL),
+(7,70,'2024-09-01',NULL),
+(7,71,'2024-09-01',NULL),
+(7,72,'2024-09-01',NULL),
+(7,73,'2024-09-01',NULL),
+
+-- Ploeg 8: SP074–SP084
+(8,74,'2024-09-01',NULL),
+(8,75,'2024-09-01',NULL),
+(8,76,'2024-09-01',NULL),
+(8,77,'2024-09-01',NULL),
+(8,78,'2024-09-01',NULL),
+(8,79,'2024-09-01',NULL),
+(8,80,'2024-09-01',NULL),
+(8,81,'2024-09-01',NULL),
+(8,82,'2024-09-01',NULL),
+(8,83,'2024-09-01',NULL),
+(8,84,'2024-09-01',NULL),
+
+-- Ploeg 9: SP085–SP093
+(9,85,'2024-09-01',NULL),
+(9,86,'2024-09-01',NULL),
+(9,87,'2024-09-01',NULL),
+(9,88,'2024-09-01',NULL),
+(9,89,'2024-09-01',NULL),
+(9,90,'2024-09-01',NULL),
+(9,91,'2024-09-01',NULL),
+(9,92,'2024-09-01',NULL),
+(9,93,'2024-09-01',NULL),
+
+-- Ploeg 10: SP094–SP105
+(10,94,'2024-09-01',NULL),
+(10,95,'2024-09-01',NULL),
+(10,96,'2024-09-01',NULL),
+(10,97,'2024-09-01',NULL),
+(10,98,'2024-09-01',NULL),
+(10,99,'2024-09-01',NULL),
+(10,100,'2024-09-01',NULL),
+(10,101,'2024-09-01',NULL),
+(10,102,'2024-09-01',NULL),
+(10,103,'2024-09-01',NULL),
+(10,104,'2024-09-01',NULL),
+(10,105,'2024-09-01',NULL),
+
+-- Ploeg 11: SP106–SP116
+(11,106,'2024-09-01',NULL),
+(11,107,'2024-09-01',NULL),
+(11,108,'2024-09-01',NULL),
+(11,109,'2024-09-01',NULL),
+(11,110,'2024-09-01',NULL),
+(11,111,'2024-09-01',NULL),
+(11,112,'2024-09-01',NULL),
+(11,113,'2024-09-01',NULL),
+(11,114,'2024-09-01',NULL),
+(11,115,'2024-09-01',NULL),
+(11,116,'2024-09-01',NULL);
+
+#!markdown
+
+## SELECT operaties
+
+Geef bij elke thema 5 queries (m.u.v. set-functies - 3 queries)
+
+Let op: Bij elke query hoort een vraag! 
+
+#!markdown
+
+### Thema 1: Select - Where
+
+#!markdown
+
+Vraag 1
+
+#!sql-SqlServer
+
+-- Query 1
+
+#!markdown
+
+Vraag 2
+
+#!sql-SqlServer
+
+-- Query 2
+
+#!markdown
+
+Vraag 3
+
+#!sql-SqlServer
+
+-- Query 3
+
+#!markdown
+
+Vraag 4
+
+#!sql-SqlServer
+
+-- Query 4
+
+#!markdown
+
+Vraag 5
+
+#!sql-SqlServer
+
+-- Query 5
+
+#!markdown
+
+### Thema: Scalaire functies
+
+#!markdown
+
+Vraag 1
+
+#!sql-SqlServer
+
+-- Query 1
+
+#!markdown
+
+Vraag 2
+
+#!sql-SqlServer
+
+-- Query 2
+
+#!markdown
+
+Vraag 3
+
+#!sql-SqlServer
+
+-- Query 3 
+
+#!markdown
+
+Vraag 4
+
+#!sql-SqlServer
+
+-- Query 4 
+
+#!markdown
+
+Vraag 5
+
+#!sql-SqlServer
+
+-- Query 5 
+
+#!markdown
+
+### Thema: Joins deel 1 + deel 2 
+
+Gebruik minstens een keer een inner, left en right  join.
+
+#!markdown
+
+Vraag 1
+
+#!sql-SqlServer
+
+-- Query1
+
+#!markdown
+
+Vraag 2
+
+#!sql-SqlServer
+
+-- Query 2
+
+#!markdown
+
+Vraag 3
+
+#!sql-SqlServer
+
+-- Query 3 
+
+#!markdown
+
+Vraag 4
+
+#!sql-SqlServer
+
+-- Query 4 
+
+#!markdown
+
+Vraag 5
+
+#!sql-SqlServer
+
+-- Query 5 
+
+#!markdown
+
+### Thema: Subqueries
+
+#!markdown
+
+Vraag 1
+
+#!sql-SqlServer
+
+-- Query1
+
+#!markdown
+
+Vraag 2
+
+#!sql-SqlServer
+
+-- Query2 
+
+#!markdown
+
+Vraag 3
+
+#!sql-SqlServer
+
+-- Query3 
+
+#!markdown
+
+Vraag 4
+
+#!sql-SqlServer
+
+-- Query4 
+
+#!markdown
+
+Vraag 5
+
+#!sql-SqlServer
+
+-- Query5 
+
+#!markdown
+
+### Thema: Set-functies
+
+#!markdown
+
+Vraag 1
+
+#!sql-SqlServer
+
+-- Query1 
+
+#!markdown
+
+Vraag 2
+
+#!sql-SqlServer
+
+-- Query2 
+
+#!markdown
+
+Vraag 3
+
+#!sql-SqlServer
+
+-- Query3 
+
+#!markdown
+
+### Thema: Group by
+
+#!markdown
+
+Vraag 1
+
+#!sql-SqlServer
+
+-- Query1 
+
+#!markdown
+
+Vraag 2
+
+#!sql-SqlServer
+
+-- Query2  
+
+#!markdown
+
+Vraag 3
+
+#!sql-SqlServer
+
+-- Query3
+
+#!markdown
+
+Vraag 4
+
+#!sql-SqlServer
+
+-- Query4 
+
+#!markdown
+
+Vraag 5
+
+#!sql-SqlServer
+
+-- Query5 
