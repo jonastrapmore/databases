@@ -1,0 +1,145 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"name":"csharp"},{"name":"fsharp","languageName":"F#","aliases":["f#","fs"]},{"name":"html","languageName":"HTML"},{"name":"http","languageName":"HTTP"},{"name":"javascript","languageName":"JavaScript","aliases":["js"]},{"name":"mermaid","languageName":"Mermaid"},{"name":"pwsh","languageName":"PowerShell","aliases":["powershell"]},{"name":"sql-SqlServer","languageName":"T-SQL"},{"name":"value"}]}}
+
+#!markdown
+
+# Invulsjabloon project: deel SQL
+
+#!csharp
+
+// Deze code laad de Polygot plugin die nodig is om te communiceren met SQL Server.
+// Voer deze code uit voordat je SQL Server gerelateerde cellen uitvoert.
+#r "nuget:Microsoft.DotNet.Interactive.SqlServer, *-*"
+
+#!csharp
+
+// Je mag deze code niet aanpassen en moet deze NIET begrijpen.
+// Voer deze code uit voordat je SQL Server gerelateerde cellen uitvoert.
+
+using Microsoft.DotNet.Interactive;
+using Microsoft.DotNet.Interactive.Commands;
+
+var shortName = "SqlServer";             
+var fullName  = $"sql-{shortName}";
+
+var kernels = Kernel.Root.FindKernels(k => k.Name == fullName);
+
+if (!kernels.Any())
+{
+    await Kernel.Root.SendAsync(new SubmitCode(
+        @"#!connect mssql --kernel-name SqlServer --connection-string ""Server=localhost,1433;Database=Databases;User Id=sa;Password=Pass.Word;TrustServerCertificate=True;"""
+    ));
+}
+
+#!markdown
+
+Opgave 1 - 3 punten
+Geef het aantal actieve klanten (accountStatus = 'Active') per primaryFreightType, gesorteerd aflopend op aantal.
+​
+
+#!sql-SqlServer
+
+SELECT primaryFreightType, COUNT(*) AS CustomerCount
+FROM lo.Customer
+WHERE accountStatus = 'Active'
+GROUP BY primaryFreightType
+ORDER BY CustomerCount DESC;
+
+#!markdown
+
+Opgave 2 - 3 punten
+Geef de top 5 routes (routeNumber) met de hoogste totale revenue uit Loads, inclusief fuelSurcharge.
+​
+
+#!sql-SqlServer
+
+SELECT TOP 5 r.routeNumber, SUM(l.revenue + l.fueSurcharge) AS TotalRevenue
+FROM lo.Route r
+JOIN lo.Load l ON r.id = l.routeId
+GROUP BY r.routeNumber
+ORDER BY TotalRevenue DESC;
+
+#!markdown
+
+Opgave 3 - 4 punten
+Schrijf een query die voor elke actieve truck (status = 'Active') het aantal trips en gemiddelde averageMpg toont, alleen trucks met meer dan 5 trips. Sorteer op gemiddelde MPG aflopend.
+​
+
+#!sql-SqlServer
+
+SELECT t.unitNumber, COUNT(tr.id) AS TripCount, AVG(tr.averageMpg) AS AvgMPG
+FROM lo.Truck t
+JOIN lo.Trip tr ON t.id = tr.truckId
+WHERE t.status = 'Active'
+GROUP BY t.unitNumber
+HAVING COUNT(tr.id) > 5
+ORDER BY AvgMPG DESC;
+
+#!markdown
+
+Opgave 4 - 5 punten
+Geef chauffeurs (firstname + lastname) met trips > 1000 miles (actualDistanceMiles), gegroepeerd per homeTerminal, met totale afstand en aantal trips. Alleen terminals met > 3 chauffeurs.
+
+#!sql-SqlServer
+
+WITH TerminalDrivers AS (
+    SELECT d.homeTerminal,
+           COUNT(DISTINCT d.id) AS DriverCount
+    FROM lo.Driver d
+    JOIN lo.Trip t ON d.id = t.driverId
+    WHERE t.actualDistanceMiles > 1000 
+      AND d.employmentStatus = 'Active'
+    GROUP BY d.homeTerminal
+    HAVING COUNT(DISTINCT d.id) > 3
+)
+SELECT td.homeTerminal, 
+       CONCAT(d.firstname, ' ', d.lastname) AS DriverName,
+       SUM(t.actualDistanceMiles) AS TotalMiles, 
+       COUNT(t.id) AS TripCount
+FROM TerminalDrivers td
+JOIN lo.Driver d ON td.homeTerminal = d.homeTerminal
+JOIN lo.Trip t ON d.id = t.driverId
+WHERE t.actualDistanceMiles > 1000 AND d.employmentStatus = 'Active'
+GROUP BY td.homeTerminal, d.firstname, d.lastname
+ORDER BY td.homeTerminal, TotalMiles DESC;
+
+SELECT td.homeTerminal, 
+       CONCAT(d.firstname, ' ', d.lastname) AS DriverName,
+       SUM(t.actualDistanceMiles) AS TotalMiles, 
+       COUNT(t.id) AS TripCount
+FROM (
+    SELECT d.homeTerminal,
+           COUNT(DISTINCT d.id) AS DriverCount
+    FROM lo.Driver d
+    JOIN lo.Trip t ON d.id = t.driverId
+    WHERE t.actualDistanceMiles > 1000 
+      AND d.employmentStatus = 'Active'
+    GROUP BY d.homeTerminal
+    HAVING COUNT(DISTINCT d.id) > 3
+) td
+JOIN lo.Driver d ON td.homeTerminal = d.homeTerminal
+JOIN lo.Trip t ON d.id = t.driverId
+WHERE t.actualDistanceMiles > 1000 AND d.employmentStatus = 'Active'
+GROUP BY td.homeTerminal, d.firstname, d.lastname
+ORDER BY td.homeTerminal, TotalMiles DESC;
+
+#!markdown
+
+Opgave 5 - 5 punten
+Vind on-time deliveries (onTimeFlag=1) per route, met percentage on-time t.o.v. totale events. Alleen routes > 50% on-time.
+
+#!sql-SqlServer
+
+WITH OnTimeStats AS (
+    SELECT l.routeId,
+           SUM(CASE WHEN de.onTimeFlag = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*) AS OnTimePct
+    FROM lo.DeliveryEvent de
+    JOIN lo.Load l ON de.loadId = l.id
+    GROUP BY l.routeId  -- Trip JOIN niet strikt nodig
+)
+SELECT r.routeNumber, ROUND(ots.OnTimePct, 2) AS OnTimePct
+FROM OnTimeStats ots
+JOIN lo.Route r ON ots.routeId = r.id
+WHERE ots.OnTimePct > 50
+ORDER BY ots.OnTimePct DESC;

@@ -1,0 +1,276 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"name":"csharp"},{"name":"fsharp","languageName":"F#","aliases":["f#","fs"]},{"name":"html","languageName":"HTML"},{"name":"http","languageName":"HTTP"},{"name":"javascript","languageName":"JavaScript","aliases":["js"]},{"name":"mermaid","languageName":"Mermaid"},{"name":"pwsh","languageName":"PowerShell","aliases":["powershell"]},{"name":"sql-SqlServer","languageName":"T-SQL"},{"name":"value"}]}}
+
+#!markdown
+
+# Invulsjabloon project: deel SQL
+
+#!csharp
+
+// Deze code laad de Polygot plugin die nodig is om te communiceren met SQL Server.
+// Voer deze code uit voordat je SQL Server gerelateerde cellen uitvoert.
+#r "nuget:Microsoft.DotNet.Interactive.SqlServer, *-*"
+
+#!csharp
+
+// Je mag deze code niet aanpassen en moet deze NIET begrijpen.
+// Voer deze code uit voordat je SQL Server gerelateerde cellen uitvoert.
+
+using Microsoft.DotNet.Interactive;
+using Microsoft.DotNet.Interactive.Commands;
+
+var shortName = "SqlServer";             
+var fullName  = $"sql-{shortName}";
+
+var kernels = Kernel.Root.FindKernels(k => k.Name == fullName);
+
+if (!kernels.Any())
+{
+    await Kernel.Root.SendAsync(new SubmitCode(
+        @"#!connect mssql --kernel-name SqlServer --connection-string ""Server=localhost,1433;Database=Databases;User Id=sa;Password=Pass.Word;TrustServerCertificate=True;"""
+    ));
+}
+
+#!markdown
+
+### Thema 1: Basis Queries
+
+#!markdown
+
+Vraag 1: Actieve klanten, gesorteerd op revenue:
+
+#!sql-SqlServer
+
+SELECT name, customernumber, annualRevenuePotential FROM lo.Customer 
+WHERE accountStatus = 'Active' 
+ORDER BY annualRevenuePotential DESC;
+
+#!markdown
+
+Vraag 2: Actieve trucks >100 gallon:
+
+#!sql-SqlServer
+
+SELECT unitNumber, make, modelYear,tankCapacityGallons FROM lo.Truck 
+WHERE status = 'Active' AND tankCapacityGallons > 100
+order by tankCapacityGallons desc;
+
+#!markdown
+
+Vraag 3: Loadtypes >10 loads:
+
+#!sql-SqlServer
+
+-- Query 3
+SELECT loadType, COUNT(*) AS count 
+FROM lo.Load GROUP BY loadType HAVING COUNT(*) > 10;
+
+#!markdown
+
+### Thema: Joins Multi-Tabel
+
+#!markdown
+
+Vraag 1: 1. Trip met customer/route:
+
+#!sql-SqlServer
+
+SELECT t.*, c.name AS customerName, r.originCity 
+FROM lo.Trip t 
+INNER JOIN lo.Load l ON t.loadId = l.id 
+INNER JOIN lo.Customer c ON l.customerId = c.id 
+INNER JOIN lo.Route r ON l.routeId = r.id;
+
+#!markdown
+
+Vraag 2: Drivers met completed trips:
+
+#!sql-SqlServer
+
+SELECT d.*, t.unitNumber, l.revenue 
+FROM lo.Driver d INNER JOIN lo.Trip tr ON d.id = tr.driverId 
+INNER JOIN lo.Load l ON tr.loadId = l.id 
+INNER JOIN lo.Truck t ON tr.truckId = t.id 
+WHERE tr.tripStatus = 'Completed';
+
+#!markdown
+
+Vraag 3: Late deliveries:
+
+#!sql-SqlServer
+
+SELECT de.*, c.name AS customer, f.city 
+FROM lo.DeliveryEvent de INNER JOIN lo.Trip tr ON de.tripId = tr.id 
+INNER JOIN lo.Load l ON de.loadId = l.id 
+INNER JOIN lo.Customer c ON l.customerId = c.id 
+INNER JOIN lo.Facilities f ON de.facilityId = f.id 
+WHERE de.onTimeFlag = 0;
+
+#!markdown
+
+### Aggregatie Groepering
+
+#!markdown
+
+Vraag 1: Revenue per freighttype >1M:
+
+#!sql-SqlServer
+
+SELECT primaryFreightType, SUM(annualRevenuePotential) AS totalRevenue
+FROM lo.Customer WHERE accountStatus = 'Active'
+GROUP BY primaryFreightType HAVING SUM(annualRevenuePotential) > 1000000;
+
+#!markdown
+
+Vraag 2: Gemiddelde MPG per truck make:
+
+#!sql-SqlServer
+
+SELECT t.make, AVG(tr.averageMpg) AS avgMpg
+FROM lo.Truck t INNER JOIN lo.Trip tr ON t.id = tr.truckId 
+WHERE tr.tripStatus = 'Completed'
+GROUP BY t.make ORDER BY avgMpg DESC;
+
+#!markdown
+
+Vraag 3:Delivery events met ROLLUP:
+
+#!sql-SqlServer
+
+SELECT locationState, COUNT(*) AS count
+FROM lo.DeliveryEvent de INNER JOIN lo.Facilities f ON de.facilityId = f.id
+GROUP BY locationState WITH ROLLUP;
+
+#!markdown
+
+### Thema: Subqueries
+
+#!markdown
+
+Vraag 1: Loads boven gemiddelde revenue:
+
+#!sql-SqlServer
+
+SELECT * FROM lo.Load WHERE revenue > (SELECT AVG(revenue) FROM lo.Load);
+
+#!markdown
+
+Vraag 2: Drivers boven gemiddelde trips:
+
+#!sql-SqlServer
+
+SELECT d.* FROM lo.Driver d WHERE (SELECT COUNT(*) FROM lo.Trip tr WHERE tr.driverId = d.id) > 
+(SELECT AVG(tripCount) FROM (SELECT COUNT(*) AS tripCount FROM lo.Trip GROUP BY driverId) avg);
+
+#!markdown
+
+Vraag 3: Langste routes per state:
+
+#!sql-SqlServer
+
+SELECT * FROM lo.Route r1 WHERE typicalDistanceMiles > ALL 
+(SELECT typicalDistanceMiles FROM lo.Route r2 WHERE r2.originState = r1.originState);
+
+#!markdown
+
+### Thema:Window Functions CTEs
+
+#!markdown
+
+Vraag 1: Top 5 loads per customer:
+
+#!sql-SqlServer
+
+WITH rankedLoads AS (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY customerId ORDER BY revenue DESC) AS rn
+  FROM lo.Load
+) SELECT * FROM rankedLoads WHERE rn <= 5;
+
+#!markdown
+
+Vraag 2: Running total fuel per trip:
+
+#!sql-SqlServer
+
+SELECT *, SUM(totalCost) OVER (PARTITION BY tripId ORDER BY purchaseDate) AS runningTotal
+FROM lo.Fuel;
+
+#!markdown
+
+Vraag 3: On-time % per loadType:
+
+#!sql-SqlServer
+
+WITH ontimeCTE AS (
+  SELECT l.loadType, COUNT(*) AS total, SUM(CASE WHEN de.onTimeFlag = 1 THEN 1 ELSE 0 END) AS ontime
+  FROM lo.DeliveryEvent de INNER JOIN lo.Trip tr ON de.tripId = tr.id 
+  INNER JOIN lo.Load l ON tr.loadId = l.id GROUP BY l.loadType
+) SELECT loadType, CAST(ontime * 100.0 / total AS DECIMAL(5,2)) AS ontimePct FROM ontimeCTE;
+
+#!markdown
+
+### Thema: DML Optimalisatie
+
+#!markdown
+
+Vraag 1:Nieuwe delivery event:
+
+#!sql-SqlServer
+
+INSERT INTO lo.DeliveryEvent (eventnumber, loadId, tripId, type, facilityId, scheduledDatetime, actualDatetime, detentionMinutes, onTimeFlag, locationCity, locationState)
+VALUES ('EVT001', 1, 1, 'Pickup', 1, '2026-01-01 09:00', '2026-01-01 09:00', 0, 1, 'City1', 'State1');
+
+#!markdown
+
+Vraag 2:  Update terminated drivers:
+
+#!sql-SqlServer
+
+UPDATE lo.Driver SET employmentStatus = 'Inactive' WHERE terminationdate IS NOT NULL;
+
+#!markdown
+
+Vraag 3:  Optimalisatie Trip distance:
+
+#!sql-SqlServer
+
+CREATE INDEX IX_Trip_Distance ON lo.Trip(actualDistanceMiles); + OPTION (RECOMPILE).
+
+#!markdown
+
+### Thema: Complexe Scenario's
+
+#!markdown
+
+Vraag 1:  Pivot revenue per status:
+
+#!sql-SqlServer
+
+SELECT * FROM (SELECT bookingType, loadStatus, revenue FROM lo.Load) src
+PIVOT (SUM(revenue) FOR loadStatus IN ([Booked], [In Transit], [Delivered])) pvt;
+
+#!markdown
+
+Vraag 2:  Recursive facilities:
+
+#!sql-SqlServer
+
+WITH facilityHierarchy AS (
+  SELECT id, facilityName, state, 0 AS level FROM lo.Facilities WHERE type = 'Root'
+  UNION ALL
+  SELECT f.id, f.facilityName, f.state, h.level + 1 
+  FROM lo.Facilities f INNER JOIN facilityHierarchy h ON f.state = h.state
+) SELECT * FROM facilityHierarchy;
+
+#!markdown
+
+Vraag 3:  Driver met meeste idle time:
+
+#!sql-SqlServer
+
+SELECT TOP 1 d.*, SUM(tr.idleTimeHours) AS totalIdle
+FROM lo.Driver d INNER JOIN lo.Trip tr ON d.id = tr.driverId 
+WHERE d.terminationdate IS NULL AND tr.tripStatus = 'Completed'
+GROUP BY d.id, d.drivernumber, d.firstname, d.lastname
+ORDER BY totalIdle DESC;

@@ -4,7 +4,7 @@
 
 #!markdown
 
-# Oefeningen: Create (Project)
+# Oefeningen: Create (Project) - Oplossingen
 
 #!csharp
 
@@ -57,7 +57,7 @@ Hint: Als je een *.sql* script zou willen schrijven (zoals je voor de volgende l
 
 #!sql-SqlServer
 
--- Oplossing oefening 1
+CREATE SCHEMA Project;
 
 #!markdown
 
@@ -78,7 +78,45 @@ Een tabel met een verwijzende sleutel kan niet aangemaakt worden zonder dat de t
 
 #!sql-SqlServer
 
--- Oplossing oefening 2
+CREATE TABLE Project.Afdeling
+(
+    id int IDENTITY (1,1),
+    naam varchar(45) NOT NULL,
+    CONSTRAINT PK_Afdeling PRIMARY KEY (id)
+);
+
+CREATE TABLE Project.Project
+(
+    id int IDENTITY (1,1),
+    naam varchar(45) NOT NULL,
+    afdelingId int NULL,
+    CONSTRAINT PK_Project PRIMARY KEY (id),
+    CONSTRAINT FK_Project_Afdeling 
+        FOREIGN KEY (afdelingId) REFERENCES Project.Afdeling (id)
+);
+
+CREATE TABLE Project.Medewerker
+(
+    id int,
+    voornaam varchar(45) NOT NULL,
+    achternaam varchar(45) NOT NULL,
+    CONSTRAINT PK_Medewerker PRIMARY KEY (id)
+);
+
+CREATE TABLE Project.ProjectMedewerker
+(
+    id int IDENTITY (1,1),
+    projectId int NOT NULL,
+    medewerkerId int NOT NULL,
+    taak varchar(45) NULL,
+    urenGewerkt int NOT NULL DEFAULT 0,
+    CONSTRAINT PK_ProjectMedewerker PRIMARY KEY (id),
+    CONSTRAINT FK_ProjectMedewerker_Project 
+        FOREIGN KEY (projectId) REFERENCES Project.Project (id) ON DELETE CASCADE,
+    CONSTRAINT FK_ProjectMedewerker_Medewerker 
+        FOREIGN KEY (medewerkerId) REFERENCES Project.Medewerker (id) ON DELETE CASCADE,
+    CONSTRAINT UK_ProjectMedewerker UNIQUE (projectId, medewerkerId)
+); 
 
 #!markdown
 
@@ -92,7 +130,7 @@ Hint: Om je resultaat te controleren kan je, in het "SQL Server" tabblad, via de
 
 #!markdown
 
-### Tabel Afdeling
+### Tabel afdeling
 
 | id | naam |
 | :--- | :--- |
@@ -102,7 +140,9 @@ Hint: Om je resultaat te controleren kan je, in het "SQL Server" tabblad, via de
 
 #!sql-SqlServer
 
--- Oplossing tabel Afdeling
+INSERT INTO Project.Afdeling (naam) VALUES('Programmatie'); 
+INSERT INTO Project.Afdeling (naam) VALUES('Analyse'); 
+INSERT INTO Project.Afdeling (naam) VALUES('Research'); 
 
 #!markdown
 
@@ -117,7 +157,13 @@ Hint: Om je resultaat te controleren kan je, in het "SQL Server" tabblad, via de
 
 #!sql-SqlServer
 
--- Oplossing tabel Project
+INSERT INTO Project.Project
+    (naam, afdelingId)
+VALUES
+    ('Creating the models', 1),
+    ('Creating the controllers', 1),
+    ('Creating the views', 1),
+    ('Setting up DFS', 3); 
 
 #!markdown
 
@@ -132,7 +178,17 @@ Hint: Om je resultaat te controleren kan je, in het "SQL Server" tabblad, via de
 
 #!sql-SqlServer
 
--- Oplossing tabel Medewerker
+INSERT INTO Project.Medewerker (id, voornaam, achternaam) 
+VALUES (1386, 'John', 'Cleese'); 
+
+INSERT INTO Project.Medewerker (id, voornaam, achternaam) 
+VALUES (1319, 'Quentin', 'Tarantino'); 
+ 
+INSERT INTO Project.Medewerker (id, voornaam, achternaam) 
+VALUES (925, 'Matt', 'Damon'); 
+ 
+INSERT INTO Project.Medewerker (id, voornaam, achternaam) 
+VALUES (2017, 'George', 'Clooney'); 
 
 #!markdown
 
@@ -148,7 +204,20 @@ Hint: Om je resultaat te controleren kan je, in het "SQL Server" tabblad, via de
 
 #!sql-SqlServer
 
--- Oplossing tabel ProjectMedewerker
+INSERT INTO Project.ProjectMedewerker (projectId, medewerkerId, taak, urenGewerkt) 
+VALUES (2, 2017, NULL, 86); 
+ 
+INSERT INTO Project.ProjectMedewerker (projectId, medewerkerId) 
+VALUES (1, 1386); 
+
+INSERT INTO Project.ProjectMedewerker (projectId, medewerkerId, taak) 
+VALUES (2, 925, 'analist'); 
+
+INSERT INTO Project.ProjectMedewerker (projectId, medewerkerId, urenGewerkt) 
+VALUES (3, 1319, 135); 
+
+INSERT INTO Project.ProjectMedewerker (projectId, medewerkerId, taak) 
+VALUES (3, 2017, NUll); 
 
 #!markdown
 
@@ -168,7 +237,9 @@ Tabelinhoud van de tabel _ProjectMedewerken_ na de aanpassing:
 
 #!sql-SqlServer
 
--- Oplossing oefening 4
+UPDATE Project.ProjectMedewerker 
+SET taak = 'Write CSS/HTML' 
+WHERE projectId = 3; 
 
 #!markdown
 
@@ -180,13 +251,15 @@ Leg uit waarom dit wel of niet niet lukt en welke verdere gevolgen dit heeft voo
 
 #!sql-SqlServer
 
--- Oplossing oefening 5
+DELETE  
+FROM Project.Medewerker 
+WHERE id = 1386; 
 
 #!markdown
 
-**Verklaring**:
+**Verklaring**
 
-*Dubbelklik en vul verder aan*
+Het is mogelijk om de medewerker met id `1386` te verwijderen, maar omdat de foreign key `medewerkerId` in de tabel _ProjectMedewerker_ geconfigureerd is met een DTC relatie, wordt daar ook het record met id `2` verwijderd.
 
 #!markdown
 
@@ -204,7 +277,14 @@ Voeg vervolgens onderstaande data toe aan deze tabel. 
 
 #!sql-SqlServer
 
--- Oplossing oefening 6
+CREATE TABLE Project.Campus ( 
+    id int IDENTITY(1,1) PRIMARY KEY, 
+    naam varchar(100) NOT NULL 
+); 
+ 
+INSERT INTO Project.Campus (naam) 
+VALUES ('Prins Bouwdewijnlaan Edegem'), 
+       ('Veldkant Kontich'); 
 
 #!markdown
 
@@ -219,7 +299,12 @@ Je moet eerste elke bestaande medewerker aan een campus koppelen voordat je de n
 
 #!sql-SqlServer
 
--- Kolom en FK constraints toevoegen.
+-- Kolom en FK constraint toevoegen.
+ALTER TABLE Project.Medewerker 
+    ADD campusId int;
+
+ALTER TABLE Project.Medewerker 
+    ADD CONSTRAINT FK_Medewerker_Campus FOREIGN KEY (campusId) REFERENCES Project.Campus(id);
 
 #!sql-SqlServer
 
@@ -227,6 +312,11 @@ Je moet eerste elke bestaande medewerker aan een campus koppelen voordat je de n
 -- Je moet hier twee aparte code cellen gebruiken, anders detecteerd Azure Data Studio
 -- dat de kolom campusId niet bestaat en wordt de code niet uitgevoerd, ook al wordt de key 
 -- in de bovenliggende code aangemaakt.
+UPDATE Project.Medewerker 
+    SET campusId = 1;
+
+ALTER TABLE Project.Medewerker 
+    ALTER COLUMN campusId int NOT NULL; 
 
 #!markdown
 
@@ -238,7 +328,15 @@ Deze code mag geen errors geven als de tabellen of het schema nog niet bestaan, 
 
 #!sql-SqlServer
 
--- Oplossing oefening 8
+-- Tabellen verwijderen 
+DROP TABLE IF EXISTS Project.ProjectMedewerker; 
+DROP TABLE IF EXISTS Project.Project; 
+DROP TABLE IF EXISTS Project.Medewerker; 
+DROP TABLE IF EXISTS Project.Afdeling; 
+DROP TABLE IF EXISTS Project.Campus; 
+ 
+-- Schema verwijderen 
+DROP SCHEMA IF EXISTS Project; 
 
 #!markdown
 

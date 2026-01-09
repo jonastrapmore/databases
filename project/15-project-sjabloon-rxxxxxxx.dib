@@ -103,7 +103,7 @@ CREATE table petanque.Club (
     CONSTRAINT UQ_Naam UNIQUE (naam)
 );
 
--- Gefilterde unieke index voor licentienummer
+-- licentienummer moet uniek zijn als ze niet NULL is
 CREATE UNIQUE NONCLUSTERED INDEX UIX_Club_licentieNummer 
 ON petanque.Club (licentieNummer) 
 WHERE licentieNummer IS NOT NULL;
@@ -135,7 +135,7 @@ CREATE TABLE petanque.ClubTeam (
 CREATE TABLE petanque.Afdeling (
     id          int           IDENTITY(1,1),
     ReeksNiveau nvarchar(50)  NOT NULL,
-    Provincie   nvarchar(50)  NOT NULL,
+    Provincie   nvarchar(50)  NULL,
     niveauType  nvarchar(50)  NOT NULL,
 
     CONSTRAINT PK_Afdeling PRIMARY KEY (id),
@@ -169,7 +169,14 @@ CREATE TABLE petanque.Afdeling (
         CHECK (niveauType IN (
             'Provinciaal',
             'Federaal',
-            'Nationaal'))
+            'Nationaal'
+        )),
+
+    CONSTRAINT CK_Afdeling_niveauType_Provincie
+    CHECK (
+           (niveauType = 'Provinciaal' AND Provincie IS NOT NULL)
+        OR (niveauType IN ('Federaal', 'Nationaal') AND Provincie IS NULL)
+    )
 );
 
 -- create competitie tabel
@@ -208,7 +215,7 @@ CREATE TABLE petanque.Speler (
     CONSTRAINT UQ_Speler_naam_voornaam
         UNIQUE (naam, voornaam),
 
-    -- licentieNummer moet uniek zijn (AK in je ERD)
+    -- licentieNummer moet uniek zijn
     CONSTRAINT UQ_Speler_licentieNummer
         UNIQUE (licentieNummer)
 );
@@ -230,11 +237,11 @@ CREATE TABLE petanque.Terrein (
         ON DELETE CASCADE
         ON UPDATE NO ACTION,
 
-    -- lengte_m moet >= 10
+    -- lengte_m moet >= 10m
     CONSTRAINT CK_Terrein_lengte
         CHECK (lengte_cm >= 1000),
 
-    -- breedte_m moet >= 2
+    -- breedte_m moet >= 2m
     CONSTRAINT CK_Terrein_breedte
         CHECK (breedte_cm >= 200)
 );
@@ -294,10 +301,10 @@ CREATE TABLE petanque.CompetitieDeelname (
         FOREIGN KEY (ClubId)
         REFERENCES petanque.Club(id),
 
-    -- 0..2 regel kun je niet perfect in SQL afdwingen;
-    -- deze UNIQUE voorkomt wel dubbele inschrijvingen per ploeg in 1 competitie
-    CONSTRAINT UQ_CompetitieDeelname_Competitie_Ploeg
-        UNIQUE (CompetitieId, PloegId)
+    -- 0..2 regel kan ik denk ik niet in SQL afdwingen. Dit zal in het programma moeten gebeuren
+    -- Kan er wel voor zorgen dat niet dezelfde ploeg kan deelnemen in meerdere competities. 
+    CONSTRAINT UQ_CompetitieDeelname_Ploeg
+        UNIQUE (PloegId)
 );
 
 -- create Match tabel
@@ -385,7 +392,7 @@ Voorzie minstens 10 records met data per table.
 
 -- Club data - in mijn voorbeeld de ere competitie van vlaamsbrabant en 2 bijkomende clubs die geen licentie hebben gekregen
 INSERT INTO petanque.Club (provincie, naam, adres, huisnummer, postcode, gemeente, aantalTerreinen, gebouwGoedgekeurd, tshirtVerplicht, licentieNummer, oprichtingsDatum) VALUES
--- Alle 8 Vlaams Brabant clubs MET licentie (gebouw goedgekeurd)
+-- Alle 8 Vlaams Brabant clubs MET licentie
 ('Vlaams Brabant', 'Esseghem', 'Rue Jules Lahaye', '304', '1090', 'Jette', 9, 1, 1, 'c1234567', '2001-06-28'),
 ('Vlaams Brabant', 'Beersel', 'Jozef Huysmanslaan', '5', '1650', 'Beersel', 6, 1, 1, 'c2345678', '2000-01-01'),
 ('Vlaams Brabant', 'Dilbeek', 'D''arconatiestraat', '3', '1700', 'Dilbeek', 9, 1, 1, 'c3456789', '1990-01-01'),
@@ -411,8 +418,8 @@ INSERT INTO petanque.ClubTeam (ClubId, naam, aantalSpelers, actief) VALUES
 (6, 'Singel A', 11, 1),
 (7, 'Wemmel A', 11, 1),
 (8, 'Rode A', 12, 1),
-(9, 'Lint A', 10, 0),     -- Niet actief (geen licentie)
-(10, 'Schorpioen A', 11, 0); -- Niet actief (geen licentie)
+(9, 'Lint A', 10, 0),    
+(10, 'Schorpioen A', 11, 0);
 
 -- Spelers ingeven
 INSERT INTO petanque.Speler (ClubId, naam, voornaam, geboorteDatum, licentieNummer) VALUES
@@ -555,6 +562,7 @@ INSERT INTO petanque.Speler (ClubId, naam, voornaam, geboorteDatum, licentieNumm
 (8, 'MARZANO',       'Jean',      '1965-12-16', '027790');
 
 
+--spelers koppelen aan een team
 INSERT INTO petanque.TeamSpeler (PloegId, SpelerId, vanafDatum, totDatum) VALUES
 -- Esseghem A (PloegId = 1, SpelerId 1-12)
 (1, 1, '2023-07-12', NULL),
@@ -694,6 +702,8 @@ INSERT INTO petanque.TeamSpeler (PloegId, SpelerId, vanafDatum, totDatum) VALUES
 (10, 117, '2021-06-01', NULL),
 (10, 118, '2022-01-19', NULL);
 
+
+-- aantal terreinen van een club aanmaken. Terreinen per club hebben allemaal dezelfde afmetingen
 INSERT INTO petanque.Terrein (ClubId, nummer, lengte_cm, breedte_cm) VALUES
 -- Esseghem (ClubId 1, 9 terreinen) - 11.29m x 2.08m
 (1, 1, 1129, 208),
@@ -796,6 +806,8 @@ INSERT INTO petanque.Terrein (ClubId, nummer, lengte_cm, breedte_cm) VALUES
 (10, 8, 1199, 267),
 (10, 9, 1199, 267);
 
+
+-- alle verschillende afdelingen aanmaken, waar een competitie mogelijk is. 
 INSERT INTO petanque.Afdeling (ReeksNiveau, Provincie, niveauType) VALUES
 -- Provinciale afdelingen (4 per provincie + 1 Ere per provincie)
 ('Ere', 'Vlaams Brabant', 'Provinciaal'),
@@ -828,14 +840,16 @@ INSERT INTO petanque.Afdeling (ReeksNiveau, Provincie, niveauType) VALUES
 ('Provinciaal 3', 'Limburg', 'Provinciaal'),
 ('Provinciaal 4', 'Limburg', 'Provinciaal'),
 
--- Federaal niveau (landelijk)
-('Federaal 1', 'Vlaams Brabant', 'Federaal'),
-('Federaal 2', 'Vlaams Brabant', 'Federaal'),
+-- Federaal niveau (Vlaanderen)
+('Federaal 1', NULL, 'Federaal'),
+('Federaal 2', NULL, 'Federaal'),
 
--- Nationaal niveau (landelijk)
-('Nationaal 1', 'Vlaams Brabant', 'Nationaal'),
-('Nationaal 2', 'Vlaams Brabant', 'Nationaal');
+-- Nationaal niveau (Belgie)
+('Nationaal 1', NULL, 'Nationaal'),
+('Nationaal 2', NULL, 'Nationaal');
 
+
+-- competities aanmaken. In dit voorbeeld enkel de ere, de 2 federale en 2 nationale competities. We hebben maar 9 speeldagen genomen voor een competitie. We gaan ervanuit dat wie de heenronde wint ook kampioen is. 
 INSERT INTO petanque.Competitie (AfdelingId, Seizoen, startUur, aantalSpeeldagen) VALUES
 -- Provinciaal Ere per provincie
 (1,  '2025-2026', '14:00', 9),  -- Vlaams Brabant Ere
@@ -852,6 +866,7 @@ INSERT INTO petanque.Competitie (AfdelingId, Seizoen, startUur, aantalSpeeldagen
 (28, '2025-2026', '14:00', 9),  -- Nationaal 1
 (29, '2025-2026', '14:00', 9);  -- Nationaal 2
 
+-- alle matchen maken. in dit voorbeeld enkel de heenronde van de ere competitie in vlaams brabant. Zoals eerder gezegd: wie de heenronde wint is kampioen
 INSERT INTO petanque.Match
 (CompetitieId, thuisPloegId, uitPloegId, speeldag, datum, startUur, puntenThuis, puntenUit)
 VALUES
@@ -918,6 +933,8 @@ VALUES
 (1, 5, 8, 9, '2025-12-07', '14:00', 4, 5),   -- DILBEEK B - SINGEL A  
 (1,10, 6, 9, '2025-12-07', '14:00', 3, 6);   -- RODE A - KERKOM A 
 
+
+-- het aantal overwinningen ingeven in competitiedeelname. Op deze manier kan er een rangschikking komen. IsKampioen en IsDegredant wordt leeg gelaten. Als de competitie gedaan is wordt deze bepaald. 
 INSERT INTO petanque.CompetitieDeelname (CompetitieId, ClubId, PloegId, punten, isKampioen, isDegradant) VALUES
 (1, 4, 6, 9, NULL, NULL),   -- Kerkom A (9 overwinningen)
 (1, 2, 3, 6, NULL, NULL),   -- Beersel B (6 overwinningen)
@@ -930,7 +947,7 @@ INSERT INTO petanque.CompetitieDeelname (CompetitieId, ClubId, PloegId, punten, 
 (1, 5, 7, 2, NULL, NULL),   -- De Blockskes A (2 overwinningen)
 (1, 2, 2, 1, NULL, NULL);  -- Beersel A (1 overwinning)
 
---bepalen van de kampioen
+--bepalen van de kampioen na de competitie. 
 UPDATE petanque.CompetitieDeelname 
 SET isKampioen = 1
 WHERE CompetitieId = 1 
@@ -941,7 +958,7 @@ WHERE CompetitieId = 1
     ORDER BY punten DESC
   );
 
---bepalen van de degradant  
+--bepalen van de degradant na de competite.  
 UPDATE petanque.CompetitieDeelname 
 SET isDegradant = 1
 WHERE CompetitieId = 1 
@@ -952,6 +969,8 @@ AND PloegId IN (
     ORDER BY punten ASC
 );
 
+
+--de tabel met alle winnaars van de ere competities vullen. In ons geval Maar 1 record vermits ik mij geconcentreerd heb enkel Vlaams Brabant. 
 INSERT INTO petanque.Eindronde (ReeksNiveau, Provincie, winnaarPloegId, Seizoen)
 SELECT 
     'Ere' AS ReeksNiveau,
@@ -1014,7 +1033,13 @@ Vraag 3: Toon alle spelers geboren na 1 januari 1990 waarvan de familienaam met 
 #!sql-SqlServer
 
 -- Query 3
-SELECT *
+SELECT 
+  id, 
+  clubid, 
+  naam, 
+  voornaam,
+  format(CAST(geboortedatum AS DATE), 'yyyy-MM-dd') AS geboortedatum,
+  licentieNummer
 FROM petanque.Speler
 WHERE geboorteDatum > '1990-01-01'
   AND naam LIKE 'V%';
@@ -1026,12 +1051,17 @@ Vraag 4: Geef alle matchen waar de thuisploeg meer dan 6 punten scoorde en de ui
 #!sql-SqlServer
 
 -- Query 4
-SELECT s.naam, s.voornaam
-FROM petanque.Speler s
-JOIN petanque.TeamSpeler ts ON ts.SpelerId = s.id
-JOIN petanque.ClubTeam ct ON ct.ploegId = ts.PloegId
-WHERE ct.naam = 'Kerkom A'
-  AND ts.totDatum IS NULL;
+SELECT
+  CompetitieId,
+  thuisPloegId,
+  uitPloegId,
+  speeldag,
+  CONVERT(varchar(10), datum, 105)AS DatumFormatted,
+  puntenThuis,
+  puntenUit
+FROM petanque.Match
+WHERE puntenThuis > 6
+  AND puntenUit < 3;
 
 #!markdown
 
@@ -1051,17 +1081,18 @@ WHERE lengte_cm > 1150
 
 #!markdown
 
-Vraag 1: Toon per speler de volledige naam in hoofdletters en de leeftijd (afronden naar beneden).
+Vraag 1: Toon per speler de volledige naam in hoofdletters en de leeftijd
 
 #!sql-SqlServer
 
 -- Query 1
 SELECT 
-    UPPER(voornaam + ' ' + naam) AS VolledigeNaam,
+    concat(upper(voornaam), ' ', upper(naam)) as VolledigeNaam,
     DATEDIFF(YEAR, geboorteDatum, GETDATE())
       - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, geboorteDatum, GETDATE()), geboorteDatum) > GETDATE()
              THEN 1 ELSE 0 END AS Leeftijd
-FROM petanque.Speler;
+FROM petanque.Speler
+order by naam;
 
 #!markdown
 
@@ -1083,11 +1114,10 @@ Vraag 3: Toon alle competities met het seizoen opgesplitst in begin‑ en eindja
 #!sql-SqlServer
 
 -- Query 3 
-SELECT 
+SELECT DISTINCT
     Seizoen,
     LEFT(Seizoen, 4)  AS BeginJaar,
-    RIGHT(Seizoen, 4) AS EindJaar,
-    
+    RIGHT(Seizoen, 4) AS EindJaar
 FROM petanque.Competitie;
 
 #!markdown
@@ -1119,7 +1149,8 @@ SELECT
         + CAST(ct.aantalSpelers AS varchar(3)) 
         + ' spelers' AS Beschrijving
 FROM petanque.ClubTeam ct
-JOIN petanque.Club c ON c.id = ct.ClubId;
+JOIN petanque.Club c ON c.id = ct.ClubId
+order by aantalspelers, provincie, naam;
 
 #!markdown
 
@@ -1129,7 +1160,7 @@ Gebruik minstens een keer een inner, left en right  join.
 
 #!markdown
 
-Vraag 1: INNER JOIN: toon alle spelers met hun clubnaam.
+Vraag 1: toon alle spelers met hun clubnaam.
 
 #!sql-SqlServer
 
@@ -1141,16 +1172,16 @@ INNER JOIN petanque.Club c
 
 #!markdown
 
-Vraag 2: INNER JOIN met filter: toon alle wedstrijden met namen van thuis‑ en uitploeg en de club van de thuisploeg.
+Vraag 2: toon alle wedstrijden met namen van thuis‑ en uitploeg en de club van de thuisploeg.
 
 #!sql-SqlServer
 
 -- Query 2
 SELECT 
-    m.datum,
-    ctHome.naam AS ThuisPloeg,
-    ctAway.naam AS UitPloeg,
-    c.naam      AS ThuisClub
+    CONVERT(varchar(10), m.datum, 105)  AS DatumFormatted,
+    ctHome.naam                         AS ThuisPloeg,
+    ctAway.naam                         AS UitPloeg,
+    c.naam                              AS ThuisClub
 FROM petanque.Match m
 INNER JOIN petanque.ClubTeam ctHome
     ON m.thuisPloegId = ctHome.ploegId
@@ -1161,16 +1192,16 @@ INNER JOIN petanque.Club c
 
 #!markdown
 
-Vraag 3: LEFT JOIN: toon alle clubs met hun teams; clubs zonder team moeten ook verschijnen.
+Vraag 3: toon alle clubs met hun teams
 
 #!sql-SqlServer
 
 -- Query 3 
 SELECT 
-    c.naam      AS ClubNaam,
-    ct.naam     AS TeamNaam
+    c.naam  AS ClubNaam,
+    ct.naam AS TeamNaam
 FROM petanque.Club c
-LEFT JOIN petanque.ClubTeam ct
+RIGHT JOIN petanque.ClubTeam ct
     ON c.id = ct.ClubId
 ORDER BY c.naam, ct.naam;
 
@@ -1203,27 +1234,24 @@ Vraag 5: Schrijf een query die voor elke match in de provinciale Ere‑competiti
 -- Query 5 
 SELECT
     m.speeldag,
-    CONVERT(varchar(10), m.datum, 105)                 AS Datum,              -- dd-MM-yyyy
-    DATENAME(WEEKDAY, m.datum)                         AS Weekdag,            -- dagnaam
-    FORMAT(CAST(m.startUur AS datetime), 'HH:mm')      AS StartUur,           -- HH:mm
+    CONVERT(varchar(10), m.datum, 105)                 AS Datum,              
+    DATENAME(WEEKDAY, m.datum)                         AS Weekdag,            
+    FORMAT(CAST(m.startUur AS datetime), 'HH:mm')      AS StartUur,          
 
     -- thuisclub / locatie
     cHome.naam                                         AS ThuisClub,
     a.Provincie                                        AS AfdelingProvincie,
     cHome.aantalTerreinen                              AS ThuisAantalTerreinen,
     CONCAT(cHome.adres, ' ', cHome.huisnummer, ', ',
-           cHome.postcode, ' ', cHome.gemeente)        AS Speellocatie,       -- volledig adres
+           cHome.postcode, ' ', cHome.gemeente)        AS Speellocatie,      
 
-    -- ploegen
     ctHome.naam                                        AS ThuisPloeg,
     cAway.naam                                         AS UitClub,
     ctAway.naam                                        AS UitPloeg,
 
-    -- aantal huidige spelers per ploeg (TeamSpeler.totDatum IS NULL)
     tsHome.AantalSpelers                               AS ThuisAantalSpelers,
     tsAway.AantalSpelers                               AS UitAantalSpelers,
 
-    -- matchresultaat
     m.puntenThuis,
     m.puntenUit
 FROM petanque.Match m
@@ -1239,7 +1267,6 @@ JOIN petanque.ClubTeam ctAway
     ON m.uitPloegId = ctAway.ploegId
 JOIN petanque.Club cAway
     ON ctAway.ClubId = cAway.id
--- aantal huidige spelers in elke ploeg
 LEFT JOIN (
     SELECT PloegId, COUNT(*) AS AantalSpelers
     FROM petanque.TeamSpeler
@@ -1298,13 +1325,13 @@ SELECT
     aantalTerreinen
 FROM petanque.Club
 WHERE aantalTerreinen > (
-    SELECT AVG(aantalTerreinen * 1.0)
+    SELECT AVG(aantalTerreinen)
     FROM petanque.Club
 );
 
 #!markdown
 
-Vraag 3: Toon alle ploegen die deelnemen aan de competitie waarin Kerkom A kampioen werd. Geef ook hun clubnaam weer. 
+Vraag 3: Toon alle ploegen die deelnemen aan de competitie waarin Kerkom A kampioen werd. Geef ook hun clubnaam weer. Kerkom A moet je niet meer weegeven vermits die al in de vraag staat
 
 #!sql-SqlServer
 
@@ -1318,7 +1345,7 @@ JOIN petanque.Club c
     ON ct.ClubId = c.id
 WHERE ct.ploegId IN (
     SELECT PloegId
-    FROM petanque.CompetitieDeelname
+    FROM petanque.CompetitieDeelname 
     WHERE CompetitieId = (
         SELECT CompetitieId
         FROM petanque.CompetitieDeelname cd
@@ -1327,7 +1354,11 @@ WHERE ct.ploegId IN (
         WHERE ct2.naam = 'Kerkom A'
           AND cd.isKampioen = 1
     )
-);
+)
+   AND ct.ploegID <> (
+        select ploegid from petanque.ClubTeam  WHERE naam = 'Kerkom A'
+   )
+    ;
 
 #!markdown
 
@@ -1348,7 +1379,7 @@ JOIN petanque.ClubTeam ct
     ON ts.PloegId = ct.ploegId
 JOIN petanque.Club c
     ON ct.ClubId = c.id
-GROUP BY s.id, s.naam, s.voornaam, c.naam
+GROUP BY ts.vanafDatum, s.id, s.naam, s.voornaam, c.naam
 HAVING DATEDIFF(YEAR, MIN(ts.vanafDatum), GETDATE()) >= 3;
 
 #!markdown
@@ -1385,7 +1416,7 @@ ORDER BY cd.punten DESC,       -- eerst meeste punten
 
 #!markdown
 
-Vraag 1: Toon alle clubs in je databank, maar markeer in één kolom of ze een licentie hebben (“Met licentie”) of niet (“Zonder licentie”), door twee queries te combineren met een set‑operator.
+Vraag 1: Toon alle clubs of ze een licentie hebben (“Met licentie”) of niet (“Zonder licentie”)
 
 #!sql-SqlServer
 
@@ -1428,7 +1459,7 @@ order by naam
 
 #!markdown
 
-Vraag 3: toon alle ploegen die minstens 3 matchen thuis gewonnen hebben en geen kampioen gespeel zijn
+Vraag 3: toon alle ploegen die minstens 3 matchen thuis gewonnen hebben en geen kampioen gespeeld zijn
 
 #!sql-SqlServer
 
@@ -1439,9 +1470,9 @@ SELECT
 FROM petanque.Match m
 JOIN petanque.ClubTeam ct
     ON m.thuisPloegId = ct.ploegId
-WHERE m.CompetitieId = 1              -- Vlaams Brabant Ere 2025-2026 in jouw data
-  AND m.puntenThuis > m.puntenUit     -- thuisploeg wint
-  AND ct.ploegId NOT IN (             -- geen kampioen
+WHERE m.CompetitieId = 1              
+  AND m.puntenThuis > m.puntenUit     
+  AND ct.ploegId NOT IN (             
         SELECT PloegId
         FROM petanque.CompetitieDeelname
         WHERE CompetitieId = 1
@@ -1480,7 +1511,7 @@ ORDER BY punten DESC;
 
 #!markdown
 
-Vraag 2: Toon per ploeg in CompetitieId = 1 het totaal aantal gescoorde punten (thuis + uit).
+Vraag 2: Toon per ploeg het totaal aantal gescoorde punten (thuis + uit).
 
 #!sql-SqlServer
 
