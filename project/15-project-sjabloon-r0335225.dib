@@ -342,12 +342,16 @@ CREATE TABLE petanque.Match (
         REFERENCES petanque.ClubTeam(ploegId),
 
 
+    -- Thuis- en uitploeg mogen niet hetzelfde zijn
+    CONSTRAINT CK_Match_ThuisUit
+        CHECK (thuisPloegId <> uitPloegId),
+
+
     -- puntenThuis + puntenUit moeten samen 9 zijn
     CONSTRAINT CK_Match_puntenSom
         CHECK (
-            puntenThuis >= 0
-            AND puntenUit >= 0
-            AND puntenThuis + puntenUit = 9
+            (puntenThuis IS NULL AND puntenUit IS NULL)
+            OR (puntenThuis >= 0 AND puntenUit >= 0 AND puntenThuis + puntenUit = 9)
         )
 );
 
