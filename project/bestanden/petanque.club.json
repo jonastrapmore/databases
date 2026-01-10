@@ -1,0 +1,103 @@
+{
+  "bsonType": "object",
+  "title": "Club",
+  "required": ["_id", "naam", "provincie", "adres", "huisnummer", "postcode", "gemeente",
+               "aantalTerreinen", "gebouwGoedgekeurd", "tshirtVerplicht", "oprichtingsDatum"],
+  "properties": {
+    "_id": {
+      "bsonType": "objectId",
+      "description": "Unieke ID van de club (PK)"
+    },
+    "naam": {
+      "bsonType": "string",
+      "description": "Unieke clubnaam"
+    },
+    "provincie": {
+      "bsonType": "string",
+      "enum": [
+        "Oost-Vlaanderen",
+        "West-Vlaanderen",
+        "Limburg",
+        "Vlaams Brabant",
+        "Antwerpen"
+      ]
+    },
+    "adres": { "bsonType": "string" },
+    "huisnummer": { "bsonType": "string" },
+    "postcode": { "bsonType": "string" },
+    "gemeente": { "bsonType": "string" },
+    "aantalTerreinen": {
+      "bsonType": "int",
+      "enum": [3, 6, 9, 12]
+    },
+    "gebouwGoedgekeurd": {
+      "bsonType": "bool",
+      "description": "true als licentie mogelijk is"
+    },
+    "tshirtVerplicht": {
+      "bsonType": "bool"
+    },
+    "licentieNummer": {
+      "bsonType": ["string", "null"],
+      "description": "Alleen gevuld als gebouwGoedgekeurd = true (AK indien aanwezig)",
+      "mongodbIndex": {
+        "unique": true,
+        "sparse": true
+      }
+    },
+    "oprichtingsDatum": {
+      "bsonType": "date"
+    },
+    "terreinen": {
+      "bsonType": "array",
+      "description": "Embedded terreinen van de club",
+      "items": {
+        "bsonType": "object",
+        "required": ["nummer", "lengte_cm", "breedte_cm"],
+        "properties": {
+          "_id": {
+            "bsonType": "objectId",
+            "description": "Interne ID van het terrein"
+          },
+          "nummer": { "bsonType": "int" },
+          "lengte_cm": {
+            "bsonType": "int",
+            "minimum": 1000
+          },
+          "breedte_cm": {
+            "bsonType": "int",
+            "minimum": 200
+          }
+        }
+      }
+    },
+    "teams": {
+      "bsonType": "array",
+      "description": "Referenties naar teams die bij deze club horen",
+      "items": {
+        "bsonType": "object",
+        "required": ["teamId"],
+        "properties": {
+          "teamId": {
+            "bsonType": "objectId",
+            "description": "Verwijzing naar document in 'clubTeams' collectie"
+          }
+        }
+      }
+    },
+    "spelers": {
+      "bsonType": "array",
+      "description": "Optionele referenties naar spelers die bij de club zijn aangesloten",
+      "items": {
+        "bsonType": "object",
+        "required": ["spelerId"],
+        "properties": {
+          "spelerId": {
+            "bsonType": "objectId",
+            "description": "Verwijzing naar document in 'spelers' collectie"
+          }
+        }
+      }
+    }
+  }
+}
