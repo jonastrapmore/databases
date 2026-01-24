@@ -1,0 +1,97 @@
+{
+  "bsonType": "object",
+  "title": "Competitie",
+  "required": ["_id", "seizoen", "startUur", "afdeling"],
+  "properties": {
+    "_id": {
+      "bsonType": "objectId"
+    },
+    "seizoen": {
+      "bsonType": "string",
+      "description": "Bijv. '2025-2026'"
+    },
+    "startUur": {
+      "bsonType": "string",
+      "description": "Standaard startuur, bv. '14:00'"
+    },
+    "aantalSpeeldagen": {
+      "bsonType": ["int", "null"]
+    },
+
+    "afdeling": {
+      "bsonType": "object",
+      "required": ["reeksNiveau", "provincie", "niveauType"],
+      "properties": {
+        "reeksNiveau": {
+          "bsonType": "string",
+          "enum": [
+            "Nationaal 1", "Nationaal 2",
+            "Federaal 1", "Federaal 2",
+            "Ere",
+            "Provinciaal 1", "Provinciaal 2",
+            "Provinciaal 3", "Provinciaal 4"
+          ]
+        },
+        "provincie": {
+          "bsonType": "string",
+          "enum": [
+            "Vlaams Brabant",
+            "Antwerpen",
+            "Oost-Vlaanderen",
+            "West-Vlaanderen",
+            "Limburg"
+          ]
+        },
+        "niveauType": {
+          "bsonType": "string",
+          "enum": ["Provinciaal", "Federaal", "Nationaal"]
+        }
+      }
+    },
+
+    "deelnames": {
+      "bsonType": "array",
+      "description": "Inschrijvingen van ploegen in deze competitie",
+      "items": {
+        "bsonType": "object",
+        "required": ["ploegId", "clubId", "punten"],
+        "properties": {
+          "ploegId": {
+            "bsonType": "objectId",
+            "description": "Ref naar 'clubTeams'"
+          },
+          "clubId": {
+            "bsonType": "objectId",
+            "description": "Ref naar 'clubs'"
+          },
+          "punten": {
+            "bsonType": "int",
+            "minimum": 0
+          },
+          "isKampioen": {
+            "bsonType": ["bool", "null"],
+            "description": "true bij kampioen, null/false anders"
+          },
+          "isDegradant": {
+            "bsonType": ["bool", "null"]
+          }
+        }
+      }
+    },
+
+    "matchRefs": {
+      "bsonType": "array",
+      "description": "Referenties naar match-documenten",
+      "items": {
+        "bsonType": "object",
+        "required": ["matchId"],
+        "properties": {
+          "matchId": {
+            "bsonType": "objectId",
+            "description": "Verwijzing naar document in 'matches' collectie"
+          }
+        }
+      }
+    }
+  }
+}
