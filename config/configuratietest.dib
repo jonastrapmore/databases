@@ -1,0 +1,40 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"name":"csharp"},{"name":"fsharp","languageName":"F#","aliases":["f#","fs"]},{"name":"html","languageName":"HTML"},{"name":"http","languageName":"HTTP"},{"name":"javascript","languageName":"JavaScript","aliases":["js"]},{"name":"mermaid","languageName":"Mermaid"},{"name":"pwsh","languageName":"PowerShell","aliases":["powershell"]},{"name":"sql-SqlServer","languageName":"T-SQL"},{"name":"value"}]}}
+
+#!markdown
+
+# Databases (Essentials + Advanced): Configuratietest
+
+Voer onderstaande cellen één-per-één uit.
+Als je alles correct geconfigureerd hebt, zoals beschreven in de [instalatiehandleiding](https://databases.pit-graduaten.be/lessen/devenv/), zou de laatste cel je de uitvoer "CONFIGURATIETEST GESLAAGD" moeten geven. 
+
+#!csharp
+
+// Deze code laad de Polygot plugin die nodig is om te communiceren met SQL Server.
+// Voer deze code uit voordat je SQL Server gerelateerde cellen uitvoert.
+#r "nuget:Microsoft.DotNet.Interactive.SqlServer, *-*"
+
+#!csharp
+
+// Je mag deze code niet aanpassen en moet deze NIET begrijpen.
+// Voer deze code uit voordat je SQL Server gerelateerde cellen uitvoert.
+
+using Microsoft.DotNet.Interactive;
+using Microsoft.DotNet.Interactive.Commands;
+
+var shortName = "SqlServer";             
+var fullName  = $"sql-{shortName}";
+
+var kernels = Kernel.Root.FindKernels(k => k.Name == fullName);
+
+if (!kernels.Any())
+{
+    await Kernel.Root.SendAsync(new SubmitCode(
+        @"#!connect mssql --kernel-name SqlServer --connection-string ""Server=localhost,1433;Database=Databases;User Id=sa;Password=Pass.Word;TrustServerCertificate=True;"""
+    ));
+}
+
+#!sql-SqlServer
+
+SELECT UPPER('CONFIGURATIETEST GESLAAGD');

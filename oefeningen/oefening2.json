@@ -1,0 +1,81 @@
+{
+    "$jsonSchema": {
+        "title": "films",
+        "description": "data van alle films",
+        "bsonType": "object",
+        "required": [
+            "titel",
+            "releasedate",
+            "beschrijving",
+            "rating",
+            "acteurs",
+            "crew"
+        ],
+        "properties": {
+            "titel": {
+                "bsonType": "string"
+            },
+            "releasedate": {
+                "bsonType": "date"
+            },
+            "beschrijving": {
+                "bsonType": "string"
+            },
+            "rating": {
+                "bsonType": "number"
+            },
+            "acteurs": {
+                "bsonType": "array",
+                "items": {
+                    "bsonType": "object",
+                    "required": [
+                        "naam",
+                        "voornaam",
+                        "personage",
+                        "imdb"
+                    ],
+                    "properties": {
+                        "naam": {
+                            "bsonType": "string"
+                        },
+                        "voornaam": {
+                            "bsonType": "string"
+                        },
+                        "personage": {
+                            "bsonType": "string"
+                        },
+                        "imdb": {
+                            "bsonType": "string"
+                        }
+                    }
+                }
+            },
+            "crew": {
+                "bsonType": "array",
+                "items": {
+                    "bsonType": "object",
+                    "required": [
+                        "naam",
+                        "voornaam",
+                        "rol",
+                        "imdb"
+                    ],
+                    "properties": {
+                        "naam": {
+                            "bsonType": "string"
+                        },
+                        "voornaam": {
+                            "bsonType": "string"
+                        },
+                        "rol": {
+                            "bsonType": "string"
+                        },
+                        "imdb": {
+                            "bsonType": "string"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

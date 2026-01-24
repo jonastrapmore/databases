@@ -1,0 +1,35 @@
+{
+    "$jsonSchema": {
+        "title": "product",
+        "description": "Algemeen record van een product",
+        "bsonType": "object",
+        "required": ["naam", "type", "beschrijving", "productnummer", "afmetingen", "prijs"],
+        "properties": {
+            "naam": {"bsonType": "string"},
+            "type": {"bsonType": "string"},
+            "productnummer": {"bsonType": "string"},
+            "beschrijving": {"bsonType": "string"},
+            "afmetingen": {
+                "bsonType": "object",
+                "required":["hoogte","diepte", "breedte","gewicht"],
+                "properties": {
+                    "hoogte": {"bsonType": "number"},
+                    "diepte": {"bsonType": "number"},
+                    "breedte": {"bsonType": "number"},
+                    "gewicht": {"bsonType": "number"}
+                }
+            },
+            "prijs": {
+                "bsonType":"object",
+                "required":["retail", "listing"],
+                "properties":{
+                    "retail": {"bsonType":"number"},
+                    "listing": {"bsonType":"number"}
+                }
+            },
+            "details":{
+                "bsonType": "object"
+            }
+        }
+    }
+}

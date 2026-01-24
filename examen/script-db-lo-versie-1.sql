@@ -1,3 +1,5 @@
+use examen;
+go
 -------------------- Reset script --------------------
 DROP TABLE IF EXISTS lo.DeliveryEvent;
 DROP TABLE IF EXISTS lo.Fuel;

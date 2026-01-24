@@ -1,0 +1,47 @@
+{
+    "$jsonSchema": {
+        "title": "product",
+        "description": "Record van een FILM",
+        "bsonType": "object",
+        "required": ["naam", "type", "beschrijving", "productnummer"],
+        "properties": {
+            "naam": {"bsonType": "string"},
+            "type": {"bsonType": "string"},
+            "productnummer": {"bsonType": "string"},
+            "beschrijving": {"bsonType": "string"},
+            "afmetingen": {
+                "bsonType": "object",
+                "required":["hoogte","diepte", "breedte"],
+                "properties": {
+                    "hoogte": {"bsonType": "number"},
+                    "diepte": {"bsonType": "number"},
+                    "breedte": {"bsonType": "number"}
+                }
+            },
+            "prijs": {
+                "bsonType":"object",
+                "required":["retail", "listening"],
+                "properties":{
+                    "retail": {"bsonType":"number"},
+                    "listening": {"bsonType":"number"}
+                }
+            },
+            "details":{
+                "bsonType": "object",
+                "required":["title", "directedBy","writteBy","aspectRatio"],
+                "properties":{
+                    "title": {"bsonType": "string"},
+                    "aspectRatio": {"bsonType": "string"},
+                    "directedBy": {
+                        "bsonType": "array",
+                        "items":{"bsonType": "string"}
+                    },
+                    "writteBy": {
+                        "bsonType": "array",
+                        "items":{"bsonType": "string"}
+                    }
+                }
+            }
+        }
+    }
+}
